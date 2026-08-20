@@ -59,10 +59,11 @@ function getUpdaterAPI(ctx: Context) {
 
 /**
  * Required services (cordis fiber inject): the updater reads ctx.slots to
- * register the settings entry; without this declaration cordis rejects the
- * property access with "cannot get property slots without inject".
+ * register the settings entry and ctx.host for the web Host RPC fallback;
+ * without these declarations cordis rejects the property access with
+ * "cannot get property X without inject".
  */
-export const inject = ['slots']
+export const inject = ['slots', 'host']
 
 export function apply(ctx: Context): void {
   const slots = (ctx as unknown as Record<string, unknown>).slots as {

@@ -14,6 +14,34 @@ function div(className: string | undefined, text?: string): HTMLDivElement {
   return el
 }
 
+/**
+ * Fallback copy path: write to a hidden, off-screen textarea and run
+ * `document.execCommand('copy')`. Kept for environments where the async
+ * Clipboard API is unavailable (the boot page may render in an insecure
+ * context before the application has registered secure permissions).
+ * @param text - The text to copy.
+ * @returns Whether the legacy copy path reported success.
+ */
+function legacyCopy(text: string): boolean {
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.top = '-1000px'
+  textarea.style.left = '-1000px'
+  textarea.style.opacity = '0'
+  document.body.append(textarea)
+  textarea.select()
+  let ok = false
+  try {
+    ok = document.execCommand('copy')
+  } catch {
+    ok = false
+  }
+  document.body.removeChild(textarea)
+  return ok
+}
+
 /** Kernel-owned page mounted below the application's root element. */
 export class BootPage {
   private readonly root: HTMLDivElement
@@ -92,7 +120,64 @@ export class BootPage {
     report.append(div(css.failedTitle, 'Failed to load plugins'))
     for (const id of failed) report.append(div(css.failedItem, id))
     if (this.failure !== undefined) report.append(div(css.failedItem, this.failure))
+    report.append(this.buildCopyButton(failed))
     this.card.replaceChildren(this.wordmark, report)
+  }
+
+  /**
+   * Build a "Copy" button that places the full failure report on the clipboard
+   * and briefly shows a confirmation. The button itself stays unselectable so
+   * the surrounding selectable text doesn't pick up the label on a drag.
+   * @param failed - Plugin IDs that failed to load.
+   * @returns The button element, attached to the report.
+   */
+  private buildCopyButton(failed: readonly string[]): HTMLButtonElement {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = css.copyButton ?? ''
+    button.textContent = 'Copy report'
+    button.addEventListener('click', () => {
+      void this.copyReport(failed, button)
+    })
+    return button
+  }
+
+  /**
+   * Copy the full failure report to the clipboard. Falls back to a hidden
+   * textarea + execCommand when the async Clipboard API is unavailable
+   * (insecure context, missing permission, or restricted editor).
+   * @param failed - Plugin IDs that failed to load.
+   * @param button - The button to flash on success.
+   */
+  private async copyReport(failed: readonly string[], button: HTMLButtonElement): Promise<void> {
+    const text = this.formatReport(failed)
+    let copied = false
+    try {
+      if (navigator.clipboard?.writeText !== undefined) {
+        await navigator.clipboard.writeText(text)
+        copied = true
+      } else {
+        copied = legacyCopy(text)
+      }
+    } catch {
+      copied = legacyCopy(text)
+    }
+    if (copied) {
+      button.dataset.state = 'copied'
+      button.textContent = 'Copied'
+      window.setTimeout(() => {
+        delete button.dataset.state
+        button.textContent = 'Copy report'
+      }, 1500)
+    }
+  }
+
+  /** Build a plain-text representation of the failure report for the clipboard. */
+  private formatReport(failed: readonly string[]): string {
+    const lines: string[] = ['Failed to load plugins']
+    for (const id of failed) lines.push(`- ${id}`)
+    if (this.failure !== undefined) lines.push(this.failure)
+    return lines.join('\n')
   }
 
   /** Grow the rotating arc monotonically as loader entries activate. */

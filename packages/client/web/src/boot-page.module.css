@@ -75,6 +75,42 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+}
+
+.copyButton {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--dsh-boot-label-secondary);
+  background: transparent;
+  border: 1px solid var(--dsh-boot-border);
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+
+.copyButton:hover {
+  color: var(--dsh-boot-label-primary);
+  border-color: var(--dsh-boot-label-tertiary);
+}
+
+.copyButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary, var(--dsh-boot-brand));
+  outline-offset: 1px;
+}
+
+.copyButton[data-state="copied"] {
+  color: var(--dsw-alias-brand-primary, var(--dsh-boot-brand));
+  border-color: var(--dsw-alias-brand-primary, var(--dsh-boot-brand));
 }
 
 .failedTitle {

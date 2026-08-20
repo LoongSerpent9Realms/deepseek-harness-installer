@@ -41,8 +41,16 @@ function getUpdaterAPI(ctx: Context) {
     }
   }
 
-  // Fallback to Host RPC (web environment)
-  const host = (ctx as unknown as Record<string, unknown>).host
+  // Fallback to Host RPC (web environment). The cordis fiber rejects
+  // undeclared property access, and no 'host' service exists on the web
+  // surface, so read it defensively: an absent host just means the updater
+  // is unavailable here (buttons render disabled) — the plugin still mounts.
+  let host: unknown
+  try {
+    host = (ctx as unknown as Record<string, unknown>).host
+  } catch {
+    host = undefined
+  }
   const hostCall = host && typeof host === 'object'
     ? (host as Record<string, unknown>).call as ((method: string, args?: unknown) => Promise<unknown>) | undefined
     : undefined
@@ -59,11 +67,11 @@ function getUpdaterAPI(ctx: Context) {
 
 /**
  * Required services (cordis fiber inject): the updater reads ctx.slots to
- * register the settings entry and ctx.host for the web Host RPC fallback;
- * without these declarations cordis rejects the property access with
- * "cannot get property X without inject".
+ * register the settings entry. ctx.host is NOT injected — no 'host' service
+ * exists on the web surface, and the Electron path never reads it; the web
+ * fallback above probes it defensively instead.
  */
-export const inject = ['slots', 'host']
+export const inject = ['slots']
 
 export function apply(ctx: Context): void {
   const slots = (ctx as unknown as Record<string, unknown>).slots as {

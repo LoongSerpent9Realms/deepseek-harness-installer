@@ -26,6 +26,29 @@ export interface CommandResult {
 }
 
 /**
+ * Resolve package-manager command files on Windows for Node's direct spawn API.
+ * @param command - Requested executable name.
+ * @returns The executable name that Node can spawn on the current host.
+ */
+function hostCommand(command: string): string {
+  return process.platform === 'win32' && (command === 'npm' || command === 'pnpm') ? `${command}.cmd` : command
+}
+
+/**
+ * Resolve the executable and argument vector Node must spawn on this host.
+ * @param command - Requested executable name.
+ * @param args - Arguments for the requested executable.
+ * @returns The host executable and its argument vector.
+ */
+function hostInvocation(command: string, args: readonly string[]): { readonly command: string; readonly args: readonly string[] } {
+  const executable = hostCommand(command)
+  if (process.platform === 'win32' && (command === 'npm' || command === 'pnpm')) {
+    return { command: process.env.ComSpec ?? 'cmd.exe', args: ['/d', '/s', '/c', executable, ...args] }
+  }
+  return { command: executable, args }
+}
+
+/**
  * Run a command and capture its output without judging the exit status.
  * @param command - executable name.
  * @param args - command arguments.
@@ -33,7 +56,8 @@ export interface CommandResult {
  * @returns The exit status and captured streams.
  */
 export function attempt(command: string, args: readonly string[], options: RunOptions = {}): CommandResult {
-  const result = spawnSync(command, [...args], { cwd: options.cwd, env: options.env, encoding: 'utf8' })
+  const invocation = hostInvocation(command, args)
+  const result = spawnSync(invocation.command, invocation.args, { cwd: options.cwd, env: options.env, encoding: 'utf8' })
   if (result.error !== undefined) throw result.error
   return { status: result.status, stdout: result.stdout, stderr: result.stderr }
 }
@@ -58,7 +82,8 @@ export function attempt(command: string, args: readonly string[], options: RunOp
  * @returns The exit status and captured streams.
  */
 export function attemptEchoed(command: string, args: readonly string[], options: RunOptions = {}): CommandResult {
-  const result = spawnSync(command, [...args], {
+  const invocation = hostInvocation(command, args)
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: options.cwd,
     env: options.env,
     encoding: 'utf8',
@@ -95,7 +120,8 @@ export function capture(command: string, args: readonly string[], options: RunOp
  * @param options - working directory and environment.
  */
 export function run(command: string, args: readonly string[], options: RunOptions = {}): void {
-  const result = spawnSync(command, [...args], { cwd: options.cwd, env: options.env, stdio: 'inherit' })
+  const invocation = hostInvocation(command, args)
+  const result = spawnSync(invocation.command, invocation.args, { cwd: options.cwd, env: options.env, stdio: 'inherit' })
   if (result.error !== undefined) throw result.error
   if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} exited with ${String(result.status)}`)
 }

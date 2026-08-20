@@ -1,5 +1,13 @@
 /* Plugins section: compact tabs plus the configurable plugin card list. */
 
+/* Prevent text selection across the plugins settings UI. */
+.section,
+.section * {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
 .section {
   display: flex;
   flex-direction: column;

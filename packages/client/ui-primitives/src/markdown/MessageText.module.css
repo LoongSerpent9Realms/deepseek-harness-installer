@@ -6,4 +6,8 @@
      size, or every consumer's line grid breaks (44px bubble spec regression). */
   font-size: inherit;
   line-height: inherit;
+  /* Allow text selection in message text. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }

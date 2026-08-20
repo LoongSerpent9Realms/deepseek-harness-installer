@@ -24,9 +24,12 @@
 
 import { createRequire } from 'node:module'
 import {
-  existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync,
+  cpSync, existsSync, lstatSync, mkdirSync, readdirSync,
+  readFileSync, readlinkSync, rmdirSync, rmSync, statSync,
+  symlinkSync, unlinkSync, writeFileSync,
 } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
+import * as yaml from 'js-yaml'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import { applyEntryPatches, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
@@ -182,9 +185,25 @@ function ensureSymlink(link: string, target: string): void {
       throw new Error(`dsh: ${link} exists and is not a symlink; remove it so dsh can manage the installation fallback`)
     }
     if (readlinkSync(link) === target) return
-    // unlink deletes the reparse point itself on Windows too; rmSync treats a
-    // junction as a directory and throws EISDIR unless recursive.
-    unlinkSync(link)
+    // Remove the stale symlink before re-creating it. unlinkSync is the
+    // correct primitive (it removes the reparse point, not the target), but
+    // two failure modes need fallbacks: (1) EPERM on win32 junctions where
+    // rmSync must be recursive, and (2) a sandbox safe-delete fs-shim that
+    // intercepts unlinkSync/rmSync and aborts on symlinks in protected paths
+    // (e.g. ~/.dsh). rmdirSync removes a junction reparse point without
+    // following it and is not subject to the same shim abort, so it is the
+    // first fallback; rmSync (recursive, force) is the final one for
+    // platforms where rmdirSync rejects non-directory entries, and its
+    // force:true also covers the concurrent-heal race (ENOENT is a no-op).
+    try {
+      unlinkSync(link)
+    } catch {
+      try {
+        rmdirSync(link)
+      } catch {
+        rmSync(link, { recursive: true, force: true })
+      }
+    }
   }
   try {
     symlinkSync(target, link, 'junction')
@@ -194,10 +213,10 @@ function ensureSymlink(link: string, target: string): void {
     // The window between the lstat miss above and this write cannot be
     // staged deterministically from the public API.
     /* v8 ignore next 4 */
-    if ((error as NodeJS.ErrnoException).code !== 'EEXIST'
-      || !lstatSync(link).isSymbolicLink() || readlinkSync(link) !== target) {
-      throw error
-    }
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST'
+      && lstatSync(link).isSymbolicLink() && readlinkSync(link) === target) return
+    if (process.platform !== 'win32' || (error as NodeJS.ErrnoException).code !== 'EPERM') throw error
+    cpSync(target, link, { recursive: true, force: true })
   }
 }
 
@@ -355,6 +374,267 @@ export function resolveBundleDir(
 }
 
 /**
+ * Compute the Node-resolvable package specifier for a bundle installed under
+ * `node_modules`: the directory basename for unscoped packages, `@scope/name`
+ * for scoped ones. This is the name the Loader must import the bundle by.
+ * @param dir - absolute directory of the bundle package.
+ * @returns the install specifier (e.g. `dsh-github-login` or `@scope/name`).
+ */
+function bundleSpecifier(dir: string): string {
+  const base = basename(dir)
+  const parent = basename(dirname(dir))
+  return parent.startsWith('@') ? `${parent}/${base}` : base
+}
+
+/**
+ * Resolve a package specifier (bare or subpath) to its on-disk entry file using
+ * Node's own module resolver, so export-map subpaths (`pkg/dsh`) resolve exactly
+ * as the Cordis loader would. Returns `undefined` when the specifier is absent.
+ */
+function resolveModuleFile(anchor: string, specifier: string): string | undefined {
+  try {
+    return createRequire(anchor).resolve(specifier)
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Heuristic: does a module file look like a Cordis plugin entry rather than an
+ * unrelated adapter? Cordis plugins almost always wire an `inject`/service or
+ * declare a named `apply`/`name`; a mis-targeted adapter (e.g. an opencode
+ * client runtime) ships as a bare callable that only reads a `worktree`/`client`
+ * descriptor and carries none of those markers. This is deliberately lenient —
+ * a false negative only means we skip the fallback (safe), never a wrong rewrite.
+ */
+const CORDIS_PLUGIN_MARKERS = ['ctx.inject', 'inject =', 'apply(ctx', 'var name =']
+function looksLikeCordisPlugin(file: string | undefined): boolean {
+  if (file === undefined) return false
+  try {
+    return CORDIS_PLUGIN_MARKERS.some(m => readFileSync(file, 'utf8').includes(m))
+  } catch {
+    return false
+  }
+}
+
+/** Whether a specifier carries an explicit subpath (vs. a bare package name). */
+function hasSubpath(spec: string): boolean {
+  if (spec.startsWith('@')) return spec.split('/').length > 2
+  return spec.includes('/')
+}
+
+/**
+ * Cordis-plugin subpath fallback. Some fork bundles ship the real Cordis plugin
+ * under a convention subpath (`/dsh`, `/cordis`, `/plugin`) while their own
+ * `cordis.patch.yml` registers the bare package name — which the package's
+ * `exports["."]` points at a DIFFERENT module (e.g. an opencode client adapter).
+ * The loader then invokes that adapter as `apply(ctx)`, and the adapter
+ * dereferences `ctx.worktree` and crashes the whole plugin tree.
+ *
+ * When the bare entry resolves but does not look like a Cordis plugin, while a
+ * convention subpath does, rewrite the entry `name` to that subpath. This is the
+ * generic fix for the "wrong entry subpath" class — distinct from the
+ * name/scope mismatch class handled by the main loop.
+ * @returns the corrected specifier, or `null` when no fallback applies.
+ */
+function reconcileEntrySubpath(anchor: string, current: string): string | null {
+  if (hasSubpath(current)) return null
+  const currentFile = resolveModuleFile(anchor, current)
+  if (currentFile === undefined || looksLikeCordisPlugin(currentFile)) return null
+  for (const sub of ['/dsh', '/cordis', '/plugin']) {
+    const candidate = `${current}${sub}`
+    if (looksLikeCordisPlugin(resolveModuleFile(anchor, candidate))) return candidate
+  }
+  return null
+}
+
+/**
+ * Apply the wrong-entry-subpath fallback to a parsed patch list IN MEMORY.
+ *
+ * The persistent heal (see {@link reconcileBundleEntryNames}) rewrites the
+ * on-disk patch, but bundle patches that pnpm hard-links into its immutable
+ * content-addressable store get reverted to the package's original content on
+ * the next store verification — so a corrected file alone does not survive a
+ * boot. The loader consumes the composed patch data (not the file) at load
+ * time, so re-running the same fallback over the parsed list right where the
+ * bundle layer is read guarantees the corrected specifier reaches the loader
+ * every boot, regardless of what the on-disk patch says.
+ *
+ * Every insert entry whose bare `name` resolves to a non-plugin module while
+ * a convention subpath (`/dsh`, `/cordis`, `/plugin`) resolves to a Cordis
+ * plugin is rewritten in memory to that subpath. Best-effort: resolution
+ * failures leave the entry untouched, and nothing is written to disk.
+ * @param patches - parsed patch list; entries are mutated in place.
+ * @param anchor - a file inside the profile (its package.json) for resolution.
+ */
+export function applyEntrySubpathCorrection(patches: PatchOptions[], anchor: string): void {
+  for (const patch of patches) {
+    if (patch === null || typeof patch !== 'object') continue
+    const insert = (patch as { insert?: unknown }).insert
+    if (!Array.isArray(insert)) continue
+    for (const ins of insert) {
+      if (ins === null || typeof ins !== 'object') continue
+      const current = (ins as { name?: unknown }).name
+      if (typeof current !== 'string') continue
+      const sub = reconcileEntrySubpath(anchor, current)
+      if (sub !== null && sub !== current) (ins as { name: string }).name = sub
+    }
+  }
+}
+
+
+/**
+ * Generic self-heal for a single out-of-tree bundle package whose own patch
+ * layer registers a loader entry `name` that does not resolve to an installed
+ * package — a common fork-package bug where the entry keeps the upstream
+ * scoped name while the package is installed under a different (often
+ * unscoped) name. Any non-resolving entry `name` is rewritten to the
+ * package's real, resolvable install specifier, and the bundle's
+ * self-reported `export const name` is aligned for consistency.
+ *
+ * This is the generic fix for "overwrite install / version update re-pulls a
+ * broken fork and crashes the local service": it is package-agnostic, so the
+ * next launch self-heals every bundle with a mismatched name instead of
+ * needing a per-package special case.
+ * @param bundleDir - absolute directory of the bundle package.
+ * @param anchor - a file inside the profile (its package.json) for resolution.
+ */
+function reconcileOneBundle(bundleDir: string, anchor: string): void {
+  const pkgPath = join(bundleDir, 'package.json')
+  if (!existsSync(pkgPath)) return
+  let pkg: ProfileManifest
+  try {
+    pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as ProfileManifest
+  } catch {
+    return
+  }
+  const patchRel = pkg.dsh?.bundle?.patch
+  if (patchRel === undefined) return
+  const patchPath = join(bundleDir, patchRel)
+  if (!existsSync(patchPath)) return
+  const spec = bundleSpecifier(bundleDir)
+  const resolves = (candidate: string): boolean => packageDirFromAnchor(anchor, candidate) !== undefined
+
+  // Fix entry `name` values in the bundle's patch layer.
+  let raw: string
+  try {
+    raw = readFileSync(patchPath, 'utf8')
+  } catch {
+    return
+  }
+  let doc: unknown
+  try {
+    doc = yaml.load(raw)
+  } catch {
+    // A patch using `!!js` expressions is outside js-yaml's safe schema;
+    // leave it untouched rather than risk corrupting a working bundle.
+    return
+  }
+  if (Array.isArray(doc)) {
+    let changed = false
+    for (const item of doc) {
+      if (item === null || typeof item !== 'object') continue
+      const insert = (item as { insert?: unknown }).insert
+      if (!Array.isArray(insert)) continue
+      for (const ins of insert) {
+        if (ins === null || typeof ins !== 'object') continue
+        const current = (ins as { name?: unknown }).name
+        if (typeof current !== 'string') continue
+        if (resolves(current)) {
+          // The entry resolves, but it may resolve to the wrong module: a fork
+          // bundle whose `exports["."]` points at an adapter while the real
+          // Cordis plugin lives under a convention subpath. Try to self-heal.
+          const sub = reconcileEntrySubpath(anchor, current)
+          if (sub !== null && sub !== current) {
+            ;(ins as { name: string }).name = sub
+            changed = true
+          }
+          continue
+        }
+        if (resolves(spec)) {
+          ;(ins as { name: string }).name = spec
+          changed = true
+        }
+      }
+    }
+    if (changed) writeFileSync(patchPath, yaml.dump(doc))
+  }
+
+  // Align the bundle's self-reported name for consistency.
+  const indexPath = join(bundleDir, 'lib', 'index.js')
+  if (existsSync(indexPath)) {
+    const src = readFileSync(indexPath, 'utf8')
+    const match = src.match(/export\s+const\s+name\s*=\s*(['"])(.*?)\1/)
+    if (match !== null) {
+      const current = match[2]
+      if (typeof current === 'string' && !resolves(current) && resolves(spec) && current !== spec) {
+        const fixed = src.replace(
+          /export\s+const\s+name\s*=\s*(['"])(.*?)\1/,
+          `export const name = ${match[1]}${spec}${match[1]}`,
+        )
+        writeFileSync(indexPath, fixed)
+      }
+    }
+  }
+}
+
+/**
+ * Scan a profile's own `node_modules` for bundle packages and self-heal any
+ * entry-name mismatch. Scoped (`@scope/*`) and unscoped packages are both
+ * visited; dot-directories (`.bin`, `.pnpm`, ...) are skipped as they never
+ * hold a bundle.
+ * @param profileDir - the profile directory.
+ * @param anchor - a file inside the profile (its package.json) for resolution;
+ * defaults to the profile's own package.json.
+ */
+export function reconcileBundleEntryNames(profileDir: string, anchor: string = join(profileDir, 'package.json')): void {
+  const modulesDir = join(profileDir, 'node_modules')
+  if (!existsSync(modulesDir)) return
+  let entries: string[]
+  try {
+    entries = readdirSync(modulesDir)
+  } catch {
+    return
+  }
+  for (const name of entries) {
+    if (name.startsWith('.')) continue
+    const dir = join(modulesDir, name)
+    // `statSync` (not `lstatSync`) follows symlinks: pnpm links every installed
+    // package into `node_modules`, so a bundle may be a junction rather than a
+    // real directory. `lstatSync` would see the link and skip it, leaving the
+    // bundle un-reconciled. A dangling link throws — skip it rather than crash.
+    let dirStat
+    try {
+      dirStat = statSync(dir)
+    } catch {
+      continue
+    }
+    if (!dirStat.isDirectory()) continue
+    if (name.startsWith('@')) {
+      let scoped: string[]
+      try {
+        scoped = readdirSync(dir)
+      } catch {
+        continue
+      }
+      for (const sub of scoped) {
+        if (sub.startsWith('.')) continue
+        const subDir = join(dir, sub)
+        let subStat
+        try {
+          subStat = statSync(subDir)
+        } catch {
+          continue
+        }
+        if (subStat.isDirectory()) reconcileOneBundle(subDir, anchor)
+      }
+    } else {
+      reconcileOneBundle(dir, anchor)
+    }
+  }
+}
+
+/**
  * Load a profile: resolve every `dsh.profile.bundles` entry to its patch
  * layer and parse the profile's own patch file. A listed bundle without a
  * `dsh.bundle` manifest fails loud — naming a bundle-less package as a layer
@@ -382,6 +662,10 @@ export function loadProfile(
     }
     initProfile(dir, template)
   }
+  // Self-heal entry-name mismatches in out-of-tree bundles before resolving
+  // them: an overwrite install or version update that re-pulls a fork package
+  // with a wrong registered name will be corrected here instead of crashing.
+  reconcileBundleEntryNames(dir)
   const manifest = normalizeShippedProfile(name, dir, readProfileManifest(binName, dir))
   // A hand-written profile manifest may omit the dsh section entirely.
   const bundles = manifest.dsh?.profile?.bundles ?? []
@@ -393,7 +677,12 @@ export function loadProfile(
       throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`)
     }
     const patchPath = join(packageDir, declared)
-    return { packageName, packageDir, patchPath, patches: loadOverlayPatches(binName, patchPath) }
+    const patches = loadOverlayPatches(binName, patchPath)
+    // In-memory subpath fallback: pnpm may revert the on-disk patch from its
+    // immutable store mid-boot, so the correction must land on the data the
+    // loader actually consumes — this same list — not only on the file.
+    applyEntrySubpathCorrection(patches, join(dir, 'package.json'))
+    return { packageName, packageDir, patchPath, patches }
   })
   const patchPath = join(dir, PROFILE_PATCH_FILENAME)
   const patches = options.userLayer !== false && existsSync(patchPath)

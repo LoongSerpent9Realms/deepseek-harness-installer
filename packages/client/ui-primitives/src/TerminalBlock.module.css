@@ -165,6 +165,10 @@
   font: var(--dsl-terminal-font);
   overflow-x: auto;
   overflow-y: auto;
+  /* Allow text selection in terminal output. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 /* Both output scrollbars (vertical cap, horizontal pre overflow) float 2px

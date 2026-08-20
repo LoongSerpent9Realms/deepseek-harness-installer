@@ -113,7 +113,12 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('sidebar.workspaces', () => ctx.slots.register(
     {
       name: 'sidebar.workspaces',
-      children: { 'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' } },
+      children: {
+        'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' },
+        // The fold-drag overlay (e.g. ui-workspace-drag-drop) mounts inside the
+        // region via `renderSlot('sidebar.workspaces.dragDrop', {})`.
+        'sidebar.workspaces.dragDrop': { kind: 'single', scope: 'root' },
+      },
       store: createWorkspaceViewStore(),
       inject: browserInjected,
       locale: NS,

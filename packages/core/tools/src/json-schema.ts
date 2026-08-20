@@ -443,6 +443,8 @@ interface ValueFrame {
   violations: string[]
   tailViolations: string[]
   matches: number
+  /** First failing branch's first violation, kept for the matched-0 diagnostic. */
+  firstViolation?: string
 }
 
 /** The generic exception-containment diagnostic owned by one valid schema node. */
@@ -496,6 +498,15 @@ function checkValue(schema: JsonSchemaNode, value: unknown, path: string): strin
     }
     if (parent.kind === 'oneOf') {
       if (result.length === 0) parent.matches++
+      // Keep the first failing branch's reason so the matched-0 diagnostic can
+      // tell the caller what the value was missing, instead of a bare count.
+      // Nested oneOf composites are skipped: their own "branch failed" chain
+      // would recurse and explode the message at depth.
+      else {
+        const first = result[0]
+        if (first !== undefined && parent.matches === 0 && parent.firstViolation === undefined
+          && !first.includes('must match exactly one oneOf branch')) parent.firstViolation = first
+      }
     } else {
       appendViolations(parent.violations, result)
     }
@@ -520,7 +531,12 @@ function checkValue(schema: JsonSchemaNode, value: unknown, path: string): strin
           continue
         }
         if (frame.kind === 'oneOf') {
-          finish(frame.matches === 1 ? [] : [`"${diagnosticPath(frame.path)}" must match exactly one oneOf branch (matched ${frame.matches})`])
+          const base = `"${diagnosticPath(frame.path)}" must match exactly one oneOf branch (matched ${frame.matches})`
+          finish(frame.matches === 1 ? [] : [
+            frame.matches === 0 && frame.firstViolation !== undefined
+              ? `${base}; first branch failed: ${frame.firstViolation}`
+              : base,
+          ])
           continue
         }
         appendViolations(frame.violations, frame.tailViolations)

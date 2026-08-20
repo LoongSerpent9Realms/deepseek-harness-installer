@@ -230,7 +230,14 @@ function validateInput(
   method: CordisInspectMethodManifest,
   input: JsonValue | undefined,
 ): void {
-  const violations = validateJsonSchemaValue(method.inputSchema as JsonSchemaNode, input ?? {}, 'input')
+  // A degenerate explicit input (bare string, array, number) is almost always
+  // the model navigating a compact directory without a root; treat it like an
+  // omitted input rather than failing the whole query. Object-shaped inputs
+  // (including {}) still validate strictly against the method's schema.
+  const effective: JsonValue = typeof input === 'object' && input !== null && !Array.isArray(input)
+    ? input
+    : {}
+  const violations = validateJsonSchemaValue(method.inputSchema as JsonSchemaNode, effective, 'input')
   if (violations.length > 0) throw new Error(`${platform} Cordis inspect ${provider}.${method.name} rejected input: ${violations.join('; ')}`)
 }
 

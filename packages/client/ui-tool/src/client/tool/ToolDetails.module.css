@@ -14,6 +14,10 @@
   overflow-wrap: anywhere;
   color: var(--dsw-alias-label-tertiary);
   font: var(--dsw-font-xs-13);
+  /* Allow text selection in tool recovery output. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .code {
@@ -27,6 +31,10 @@
   color: var(--dsw-alias-label-primary);
   white-space: pre-wrap;
   word-break: break-word;
+  /* Allow text selection in tool code output. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .code[data-error] {
@@ -36,6 +44,10 @@
 .read,
 .web {
   margin: 0;
+  /* Allow text selection in tool read/web output. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .empty {

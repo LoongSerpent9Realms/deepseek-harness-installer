@@ -18,6 +18,10 @@
    MarkdownText margins are trimmed so the list sits tight under it. */
 .answer {
   margin-bottom: 8px;
+  /* Allow text selection in web answer content. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .answer > :global(div) > :first-child {
@@ -62,6 +66,10 @@
   font-size: 14px;
   line-height: 20px;
   word-break: break-word;
+  /* Allow text selection in source links. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .sourceLink:hover {
@@ -74,6 +82,10 @@
   font-size: 13px;
   line-height: 19px;
   word-break: break-word;
+  /* Allow text selection in source snippets. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .published {
@@ -106,6 +118,10 @@
   font-size: 13px;
   line-height: 19px;
   word-break: break-all;
+  /* Allow text selection in fetch URLs. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .fetchUrl:hover {

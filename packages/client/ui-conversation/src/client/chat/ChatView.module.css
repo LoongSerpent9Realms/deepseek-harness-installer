@@ -3,6 +3,17 @@
    `[data-conversation-scroll]` the column host owns overflow and this view
    is ordinary flow (see ConversationRoot active-phase rules). */
 
+/* Prevent text selection across the chat view UI (conversation content handled separately). */
+.root,
+.root *,
+.scroll,
+.column,
+.flowItem {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
 .root {
   position: relative;
   display: flex;

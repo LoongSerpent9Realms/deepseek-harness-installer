@@ -7,15 +7,19 @@
 import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { load as yamlLoad } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 import {
+  applyEntrySubpathCorrection,
   composeEntries,
   healProfilesModuleFallback,
   initProfile,
+  loadOverlayPatches,
   loadProfile,
   PROFILE_PATCH_FILENAME,
   PROFILE_TEMPLATES,
   readProfileManifest,
+  reconcileBundleEntryNames,
   resolveBundleDir,
   resolveProfileDir,
   writeProfileManifest,
@@ -268,5 +272,168 @@ describe('healProfilesModuleFallback', () => {
     healProfilesModuleFallback(anchor, home) // second healer sees the correct link
     const fallback = join(home, 'profiles', 'node_modules')
     expect(lstatSync(join(fallback, 'dsh-app')).isSymbolicLink()).toBe(true)
+  })
+})
+
+describe('reconcileBundleEntryNames', () => {
+  it('rewrites a non-resolving entry name to the real install specifier, and leaves correct ones alone', () => {
+    const home = tmp()
+    const dir = resolveProfileDir('demo', home)
+    const stageBundle = (
+      name: string, patch: string, scoped = false,
+    ): void => {
+      const base = scoped ? join(dir, 'node_modules', ...name.split('/')) : join(dir, 'node_modules', name)
+      mkdirSync(base, { recursive: true })
+      writeFileSync(join(base, 'package.json'), JSON.stringify({
+        name, version: '0.0.0', dsh: { bundle: { patch: './cordis.patch.yml' } },
+      }))
+      writeFileSync(join(base, 'cordis.patch.yml'), patch)
+    }
+
+    // Fork bundle installed as `my-gh` but its patch keeps the upstream scoped name.
+    stageBundle('my-gh', '- insert:\n    - id: gh\n      name: "@deepseek-ai/wrong-gh"\n')
+    // Correctly-named unscoped bundle: must stay byte-for-byte unchanged.
+    const goodPatch = '- insert:\n    - id: g\n      name: good\n'
+    stageBundle('good', goodPatch)
+    // Scoped bundle whose patch name neither resolves nor matches its install specifier.
+    stageBundle('@scope/broken', '- insert:\n    - id: b\n      name: totally-wrong\n', true)
+
+    reconcileBundleEntryNames(dir)
+
+    const fixed = yamlLoad(readFileSync(join(dir, 'node_modules', 'my-gh', 'cordis.patch.yml'), 'utf8')) as { insert: { name: string }[] }[]
+    expect(fixed[0]?.insert[0]?.name).toBe('my-gh')
+    // Correct bundle untouched (no rewrite occurred).
+    expect(readFileSync(join(dir, 'node_modules', 'good', 'cordis.patch.yml'), 'utf8')).toBe(goodPatch)
+    const fixedScope = yamlLoad(readFileSync(join(dir, 'node_modules', '@scope', 'broken', 'cordis.patch.yml'), 'utf8')) as { insert: { name: string }[] }[]
+    expect(fixedScope[0]?.insert[0]?.name).toBe('@scope/broken')
+  })
+
+  it('is a no-op (and does not throw) when the profile has no node_modules', () => {
+    const home = tmp()
+    const dir = resolveProfileDir('empty', home)
+    expect(() => reconcileBundleEntryNames(dir)).not.toThrow()
+  })
+
+  it('aligns lib/index.js self-reported name and skips non-bundle dirs', () => {
+    const home = tmp()
+    const dir = resolveProfileDir('demo2', home)
+    const base = join(dir, 'node_modules', 'fixme')
+    mkdirSync(join(base, 'lib'), { recursive: true })
+    writeFileSync(join(base, 'package.json'), JSON.stringify({
+      name: 'fixme', version: '0.0.0', dsh: { bundle: { patch: './cordis.patch.yml' } },
+    }))
+    writeFileSync(join(base, 'cordis.patch.yml'), '- insert:\n    - id: f\n      name: "@scope/wrong-f"\n')
+    writeFileSync(join(base, 'lib', 'index.js'), "export const name = '@scope/wrong-f'\n")
+    // Package without dsh.bundle.patch: skipped, not fatal.
+    const plain = join(dir, 'node_modules', 'plain-lib')
+    mkdirSync(plain, { recursive: true })
+    writeFileSync(join(plain, 'package.json'), JSON.stringify({ name: 'plain-lib', version: '0.0.0' }))
+    // Directory with no package.json: skipped.
+    mkdirSync(join(dir, 'node_modules', 'no-manifest'), { recursive: true })
+
+    reconcileBundleEntryNames(dir)
+
+    const fixed = yamlLoad(readFileSync(join(base, 'cordis.patch.yml'), 'utf8')) as { insert: { name: string }[] }[]
+    expect(fixed[0]?.insert[0]?.name).toBe('fixme')
+    expect(readFileSync(join(base, 'lib', 'index.js'), 'utf8')).toBe("export const name = 'fixme'\n")
+  })
+
+  it('rewrites a bare entry that resolves to an adapter (not a Cordis plugin) to its /dsh convention subpath', () => {
+    const home = tmp()
+    const dir = resolveProfileDir('demo3', home)
+    mkdirSync(dir, { recursive: true })
+    // The anchor must exist: the subpath fallback resolves modules via require.resolve.
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'profile', version: '0.0.0' }))
+
+    const base = join(dir, 'node_modules', 'ht')
+    mkdirSync(join(base, 'dist'), { recursive: true })
+    writeFileSync(join(base, 'package.json'), JSON.stringify({
+      name: 'ht', version: '0.0.0',
+      dsh: { bundle: { patch: './cordis.patch.yml' } },
+      // `exports["."]` points at an opencode client adapter, NOT the Cordis plugin.
+      exports: { '.': './dist/index.js', './dsh': './dist/dsh.js' },
+    }))
+    // Adapter: a bare callable reading a `worktree`/`client` descriptor — no plugin markers.
+    writeFileSync(join(base, 'dist', 'index.js'), 'export default async (input) => { return input?.worktree }\n')
+    // Real Cordis plugin under /dsh: carries the plugin markers.
+    writeFileSync(join(base, 'dist', 'dsh.js'), [
+      'var inject = ["x"];',
+      'function apply(ctx) { const a = ctx.inject; }',
+      "var name = 'ht';",
+      'export default { name, inject, apply }',
+      '',
+    ].join('\n'))
+    writeFileSync(join(base, 'cordis.patch.yml'), '- insert:\n    - id: ht\n      name: ht\n')
+
+    reconcileBundleEntryNames(dir)
+
+    const fixed = yamlLoad(readFileSync(join(base, 'cordis.patch.yml'), 'utf8')) as { insert: { name: string }[] }[]
+    expect(fixed[0]?.insert[0]?.name).toBe('ht/dsh')
+  })
+
+  it('corrects a bare adapter entry to its /dsh subpath in memory without touching the file', () => {
+    // The on-disk heal rewrites the patch file, but pnpm hard-links bundle
+    // patches into its immutable store and reverts them on the next store
+    // verification. The in-memory correction must therefore land on the data
+    // the loader consumes — the parsed list — and never write to disk.
+    const home = tmp()
+    const dir = resolveProfileDir('demo5', home)
+    mkdirSync(join(dir, 'node_modules', 'ht', 'dist'), { recursive: true })
+    writeFileSync(join(dir, 'node_modules', 'ht', 'package.json'), JSON.stringify({
+      name: 'ht', version: '0.0.0',
+      dsh: { bundle: { patch: './cordis.patch.yml' } },
+      exports: { '.': './dist/index.js', './dsh': './dist/dsh.js' },
+    }))
+    // Adapter: no plugin markers, like a bundled opencode client.
+    writeFileSync(join(dir, 'node_modules', 'ht', 'dist', 'index.js'), 'export default async (input) => { return input?.worktree }\n')
+    // Real Cordis plugin under /dsh.
+    writeFileSync(join(dir, 'node_modules', 'ht', 'dist', 'dsh.js'), [
+      'var inject = ["x"];',
+      'function apply(ctx) { const a = ctx.inject; }',
+      "var name = 'ht';",
+      'export default { name, inject, apply }',
+      '',
+    ].join('\n'))
+    const patchFile = join(dir, 'node_modules', 'ht', 'cordis.patch.yml')
+    const bare = '- insert:\n    - id: ht\n      name: ht\n'
+    writeFileSync(patchFile, bare)
+
+    const patches = loadOverlayPatches('t', patchFile)
+    applyEntrySubpathCorrection(patches, join(dir, 'package.json'))
+    const entry = (patches[0] as unknown as { insert: { name: string }[] } | undefined)?.insert[0]
+    expect(entry?.name).toBe('ht/dsh')
+    // The file stays byte-for-byte identical: pnpm-owned patches are not written.
+    expect(readFileSync(patchFile, 'utf8')).toBe(bare)
+  })
+
+  it('leaves a bare entry alone when it already resolves to a Cordis plugin (no false subpath switch)', () => {
+    const home = tmp()
+    const dir = resolveProfileDir('demo4', home)
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'profile', version: '0.0.0' }))
+
+    const base = join(dir, 'node_modules', 'ok')
+    mkdirSync(join(base, 'dist'), { recursive: true })
+    writeFileSync(join(base, 'package.json'), JSON.stringify({
+      name: 'ok', version: '0.0.0',
+      dsh: { bundle: { patch: './cordis.patch.yml' } },
+      // A genuine plugin shipped at the package root, plus a /dsh that also exists.
+      exports: { '.': './dist/index.js', './dsh': './dist/dsh.js' },
+    }))
+    // Main entry is itself a valid plugin: must NOT be switched to /dsh.
+    writeFileSync(join(base, 'dist', 'index.js'), [
+      'var inject = ["x"];',
+      'function apply(ctx) { ctx.inject; }',
+      "var name = 'ok';",
+      'export default { name, inject, apply }',
+      '',
+    ].join('\n'))
+    const patch = '- insert:\n    - id: ok\n      name: ok\n'
+    writeFileSync(join(base, 'cordis.patch.yml'), patch)
+
+    reconcileBundleEntryNames(dir)
+
+    // Untouched: name stays the bare `ok`, not `ok/dsh`.
+    expect(readFileSync(join(base, 'cordis.patch.yml'), 'utf8')).toBe(patch)
   })
 })

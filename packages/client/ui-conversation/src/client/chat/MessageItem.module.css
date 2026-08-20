@@ -26,6 +26,10 @@
   font-size: 16px;
   line-height: 24px;
   color: var(--dsw-alias-label-primary);
+  /* Allow text selection in conversation bubbles. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .referenceSummary {
@@ -131,6 +135,10 @@
   color: var(--dsw-alias-label-tertiary);
   font-size: 14px;
   line-height: 24px;
+  /* Allow text selection in compaction summary. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .retryRow {

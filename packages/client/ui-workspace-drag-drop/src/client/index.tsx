@@ -39,8 +39,12 @@ export const inject = ['slots', 'workspaces', 'locale']
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workspace-drag-drop: dictionaries')
 
-  // Register the overlay component
-  ctx.slots.register(
+  // Register the overlay component. The parent slot's children table
+  // (`sidebar.workspaces` registered by ui-workspace, which declares
+  // `sidebar.workspaces.dragDrop`) creates this slot's record; using
+  // slots.inject (like every upstream child-slot plugin) waits for that
+  // declaration instead of racing it in apply().
+  ctx.slots.inject('sidebar.workspaces.dragDrop', () => ctx.slots.register(
     {
       name: 'sidebar.workspaces.dragDrop',
       children: {},
@@ -59,5 +63,5 @@ export function apply(ctx: ClientContext): void {
         />
       )
     },
-  )
+  ))
 }

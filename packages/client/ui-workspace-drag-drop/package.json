@@ -1,6 +1,6 @@
 {
   "name": "@loongserpent/dsh-client-ui-workspace-drag-drop",
-  "version": "1.0.4",
+  "version": "0.1.0-rc.8",
   "description": "Drag-and-drop plugin for adding workspaces by dropping folders onto the DeepSeek Harness sidebar",
   "publishConfig": {
     "access": "public"

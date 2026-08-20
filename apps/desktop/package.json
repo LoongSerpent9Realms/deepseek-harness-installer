@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-desktop",
   "description": "DeepSeek Harness Desktop - Electron wrapper for dsh-web-app with auto-update support",
-  "version": "0.1.0-rc.7",
+  "version": "0.1.0-rc.8",
   "main": "dist/main.js",
   "type": "module",
   "files": [
@@ -37,15 +37,24 @@
       "node_modules/@deepseek-ai/dsh-web-app/**/*"
     ],
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "assets/icon.ico"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "assets/icon.icns"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "assets/icon.png"
     },
     "publish": {

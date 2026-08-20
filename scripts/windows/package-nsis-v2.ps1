@@ -160,7 +160,10 @@ try {
       for ($i = 1; $i -le $BuildRetries; $i++) {
         Write-Log "Build attempt $i / $BuildRetries"
         try {
-          Invoke-Pnpm @('run', 'build')
+          # rc.8 pack.ts --family dsh requires the OFFICIAL client build record
+          # (DSH_CLIENT_BUILD_PROFILE / DSH_CLIENT_TITLE); plain `build` writes a
+          # non-official profile and fails verifyBuildArtifacts.
+          Invoke-Pnpm @('run', 'build:official')
           $built = $true
           break
         } catch {

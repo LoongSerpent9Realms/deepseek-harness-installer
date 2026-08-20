@@ -226,8 +226,12 @@ try {
         Write-Log "Packing private plugin: $dep <- $pkgDir"
         Push-Location $pkgDir
         try {
-          & $pnpmCmd pack --pack-destination $extraDir 2>&1 | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw "pnpm pack failed for $dep (exit $LASTEXITCODE)" }
+          # Invoke-RequiredCommand (not a bare `& ... 2>&1 | Out-Null`): under
+          # $ErrorActionPreference='Stop' the merged error stream turns native
+          # stderr (e.g. the NODE_OPTIONS symlink-patch banner) into a
+          # terminating error and pack never runs. It also surfaces the real
+          # exit code for diagnostics.
+          Invoke-RequiredCommand $pnpmCmd @('pack', '--pack-destination', $extraDir)
         } finally { Pop-Location }
       } else {
         Write-Log "No in-repo source for $dep; npm will resolve it from the registry"

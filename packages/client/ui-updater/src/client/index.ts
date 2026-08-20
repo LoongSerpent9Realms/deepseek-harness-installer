@@ -242,14 +242,38 @@ export function apply(ctx: Context): void {
         style: { fontSize: '20px', fontWeight: '600', marginBottom: '20px', color: 'var(--dsw-text-primary, #1f2937)' },
       }, '应用更新'),
 
-      // Error message
+      // Error message (selectable + copyable so users can report failures)
       error && React.createElement('div', {
-        style: { padding: '12px 16px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#dc2626', fontSize: '14px', marginBottom: '16px' },
+        style: {
+          padding: '12px 16px',
+          backgroundColor: '#fef2f2',
+          border: '1px solid #fecaca',
+          borderRadius: '8px',
+          color: '#dc2626',
+          fontSize: '14px',
+          marginBottom: '16px',
+          userSelect: 'text',
+          WebkitUserSelect: 'text',
+          MozUserSelect: 'text',
+          cursor: 'text',
+        },
       }, error),
 
-      // Save success message
+      // Save success message (selectable)
       saveSuccess && React.createElement('div', {
-        style: { padding: '12px 16px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', color: '#16a34a', fontSize: '14px', marginBottom: '16px' },
+        style: {
+          padding: '12px 16px',
+          backgroundColor: '#f0fdf4',
+          border: '1px solid #bbf7d0',
+          borderRadius: '8px',
+          color: '#16a34a',
+          fontSize: '14px',
+          marginBottom: '16px',
+          userSelect: 'text',
+          WebkitUserSelect: 'text',
+          MozUserSelect: 'text',
+          cursor: 'text',
+        },
       }, '配置已保存'),
 
       // Update source configuration
@@ -384,6 +408,11 @@ export function apply(ctx: Context): void {
   }
 
   slots.inject('settings.section', () => {
+    // No updater API (e.g. web surface without a host RPC provider): do not
+    // register the settings entry at all — an empty updater panel is more
+    // confusing than absent. The Electron build exposes window.dshUpdater and
+    // the page renders normally there.
+    if (!updaterAPI) return
     slots.register(
       { name: 'settings.section', id: 'app-updater', order: 100, label: '应用更新' },
       UpdaterSettingsPage,

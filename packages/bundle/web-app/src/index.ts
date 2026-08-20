@@ -56,7 +56,10 @@ export interface Config {
 }
 
 export const Config: z<Config> = z.object({
-  openBrowser: z.boolean().default(true),
+  // DSH Desktop fork: default to NOT handing off to the system browser; the
+  // desktop shell owns the web surface. Restore per-invocation browser
+  // opening with `--open`-style config (openBrowser: true) when needed.
+  openBrowser: z.boolean().default(false),
   printUrl: z.boolean().default(true),
   surfaceContext: z.boolean().default(true),
   trustedHosts: z.array(String).default([]),

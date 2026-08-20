@@ -328,8 +328,13 @@ try {
   New-Item -ItemType Directory -Path $app -Force | Out-Null
   Copy-Item -LiteralPath (Join-Path $runtime 'node.exe'), (Join-Path $runtime 'dsh.cmd'), (Join-Path $runtime 'node_modules') -Destination $app -Recurse -Force
   Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'desktop-main.cjs') -Destination (Join-Path $app 'main.cjs') -Force
+  Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'desktop-updater.cjs') -Destination (Join-Path $app 'desktop-updater.cjs') -Force
+  Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'desktop-preload.cjs') -Destination (Join-Path $app 'preload.cjs') -Force
   Copy-Item -LiteralPath 'C:\Program Files (x86)\NSIS\Contrib\Graphics\Icons\modern-install-blue-full.ico' -Destination (Join-Path $app 'icon.ico') -Force
-  @{ name = 'deepseek-harness-desktop'; main = 'main.cjs'; private = $true } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $app 'package.json') -Encoding utf8
+  # version is required for app.getVersion() (used by the updater's User-Agent
+  # and the current-version comparison).
+  @{ name = 'deepseek-harness-desktop'; main = 'main.cjs'; version = $Version; private = $true } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $app 'package.json') -Encoding utf8
 
   # ---- NSIS ----
   $makeNsis = Get-Command makensis.exe -ErrorAction SilentlyContinue

@@ -2,6 +2,7 @@
 const { app, BrowserWindow, dialog, shell } = require('electron')
 const { execFile, spawn } = require('node:child_process')
 const { join } = require('node:path')
+const { registerUpdaterHandlers } = require('./desktop-updater.cjs')
 
 let mainWindow
 let webServer
@@ -50,6 +51,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      preload: join(app.getAppPath(), 'preload.cjs'),
     },
   })
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -126,6 +128,9 @@ function startWebServer() {
 }
 
 app.whenReady().then(() => {
+  // Updater IPC: registered once here (not in createWindow) so a re-created
+  // window on macOS activate cannot double-register a channel.
+  registerUpdaterHandlers(mainWindow)
   createWindow()
   startWebServer()
 })

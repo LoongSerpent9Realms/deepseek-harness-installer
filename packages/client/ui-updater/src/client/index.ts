@@ -174,6 +174,7 @@ export function apply(ctx: Context): void {
     })
     const [checking, setChecking] = React.useState(false)
     const [saveSuccess, setSaveSuccess] = React.useState(false)
+    const [sourceExpanded, setSourceExpanded] = React.useState(false)
 
     React.useEffect(() => {
       if (config) setLocalConfig(config)
@@ -276,11 +277,33 @@ export function apply(ctx: Context): void {
         },
       }, '配置已保存'),
 
-      // Update source configuration
+      // Update source configuration (collapsible, collapsed by default)
       React.createElement('div', { style: { marginBottom: '24px' } },
-        React.createElement('h3', {
-          style: { fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: 'var(--dsw-text-primary, #1f2937)' },
-        }, '更新源'),
+        React.createElement('button', {
+          type: 'button',
+          onClick: () => setSourceExpanded(!sourceExpanded),
+          'aria-expanded': sourceExpanded,
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 12px',
+            fontSize: '16px',
+            fontWeight: '600',
+            color: 'var(--dsw-text-primary, #1f2937)',
+            background: 'transparent',
+            border: '1px solid var(--dsw-border-color, #e5e7eb)',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            marginBottom: sourceExpanded ? '12px' : 0,
+          },
+        },
+          React.createElement('span', {
+            style: { display: 'inline-block', width: '12px', color: 'var(--dsw-text-secondary, #6b7280)' },
+          }, sourceExpanded ? '▾' : '▸'),
+          React.createElement('span', null, '更新源配置'),
+        ),
+        sourceExpanded && React.createElement('div', null,
 
         // GitHub repo
         React.createElement('div', { style: rowStyle },
@@ -338,6 +361,7 @@ export function apply(ctx: Context): void {
             disabled: !hostAvailable,
             style: hostAvailable ? buttonPrimaryStyle : buttonDisabledStyle,
           }, '保存配置'),
+        ),
         ),
       ),
 

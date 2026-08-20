@@ -18,6 +18,7 @@
  * keys under each package's file config, and no package config defines it).
  */
 import { globSync, readFileSync } from 'node:fs'
+import { spawn } from 'node:child_process'
 import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'tsdown'
@@ -111,4 +112,34 @@ if (isMain) {
     `dev-web: watching ${String(pluginDirs.length)} dsh.client plugin packages`
     + `${pollInterval !== undefined ? ` (polling ${String(pollInterval)}ms)` : ''}:\n  ${pluginDirs.join('\n  ')}`,
   )
+
+  // --- new-plugin auto-restart --------------------------------------------
+  // The watch workspace is scanned once at startup, so a plugin package added
+  // while watching would never be built (this file's header documents the
+  // restart requirement). Detect the set change and respawn this process with
+  // the same invocation instead of asking the developer to do it by hand —
+  // after the AI creates a new plugin, `pnpm run dev:web` keeps working.
+  const initialDirs = new Set(pluginDirs)
+  let rescanning = false
+  const rescan = setInterval(() => {
+    if (rescanning) return
+    const current = discoverPluginDirs()
+    const added = current.filter(dir => !initialDirs.has(dir))
+    const removed = [...initialDirs].filter(dir => !current.includes(dir))
+    if (added.length === 0 && removed.length === 0) return
+    rescanning = true
+    clearInterval(rescan)
+    console.log(
+      `\ndev-web: plugin set changed — added [${added.join(', ') || 'none'}], `
+      + `removed [${removed.join(', ') || 'none'}]\n`
+      + 'dev-web: restarting to include the new packages (Ctrl+C still stops it — the child shares this terminal)\n',
+    )
+    // Same process group, inherited stdio: the respawned watch keeps this
+    // terminal and dies with the same Ctrl+C the original would have.
+    const nodeBin = process.argv[0] ?? 'node'
+    const child = spawn(nodeBin, process.argv.slice(1), { stdio: 'inherit' })
+    child.unref()
+    process.exit(0)
+  }, 1500)
+  rescan.unref()
 }

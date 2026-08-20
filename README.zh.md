@@ -1,74 +1,92 @@
-# DeepSeek Harness
+# DeepSeek Harness Desktop（DSH Desktop）
 
-[English](README.md) | 中文
+在桌面上一键运行 DeepSeek Harness —— 无需 Node.js、无需 pnpm、无需 Docker，下载即用。
 
-DeepSeek Harness（`dsh`）是由 [DeepSeek AI](https://deepseek.com) 开发的开源 agent harness（智能体框架）。
+[![Downloads](https://img.shields.io/github/downloads/LoongSerpent9Realms/deepseek-harness-installer/total.svg)](https://github.com/LoongSerpent9Realms/deepseek-harness-installer/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform: Windows | Linux](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-blue.svg)](https://github.com/LoongSerpent9Realms/deepseek-harness-installer/releases/latest)
 
-它采用**一切皆插件**的架构，并由 [Cordis](https://github.com/cordiverse/cordis) 驱动，其设计参见论文 [_A Programming Paradigm for Spatiotemporal Composability_](https://github.com/cordiverse/paper)。
+[English](README.md) · 中文
 
-## 开发者预览
+## 功能
 
-DeepSeek Harness 目前处于 _开发者预览_ 阶段，正在快速迭代。**未来将出现破坏兼容性的变更。**
+- ⚡️ **零环境** — 安装包内置 Node.js 与 Electron 运行时，无需在系统中安装 Node.js、pnpm 或 Docker，也不会修改已有的系统环境。
+- 🔄 **内核自愈** — 内置更新器自动检查 GitHub Release 并在应用内更新，上游修复无需重新安装即可同步。
+- 🔒 **纯本地 · 隐私默认** — 运行在 `127.0.0.1:3080`，profile / 会话 / 设置全部留在本机，默认关闭遥测。
+- 🪟 **桌面原生窗口** — Electron 封装（非浏览器标签页）：双击启动；回环 web 服务只在应用程序内部使用。Windows / Linux，中英双语界面。
+- 📦 **多平台** — Windows（NSIS 安装包）与 Linux（AppImage，便携免安装）。
+- 🧩 **完整 Harness 能力** — 一切皆插件架构，内置全套 dsh 能力（工具、技能、子代理、工作流等）。
 
-## 运行
+## 快速开始
 
-### 通过 `npm` 运行
+从 [Releases](https://github.com/LoongSerpent9Realms/deepseek-harness-installer/releases/latest) 下载对应平台安装包，安装后启动即可。
 
-安装 `Node.js`，然后运行：
+### Windows
 
-```sh
-npx @deepseek-ai/dsh web
+下载 `deepseek-harness-<version>-setup.exe`，运行 NSIS 安装程序。安装程序包含 DeepSeek Harness、Node.js 和 Electron，因此无需在系统中另行安装 Node.js。
+
+安装完成后，从开始菜单选择 DeepSeek Harness。它会打开独立的桌面窗口；回环 web 服务只在应用程序内部使用，不会打开浏览器。详见 [Web UI 指南](docs/user/guide/index.md)。
+
+### Linux (AppImage)
+
+从[最新发布](../../releases/latest)下载 `deepseek-harness-<version>-x86_64.AppImage`。
+
+```bash
+# Make it executable
+chmod +x deepseek-harness-*-x86_64.AppImage
+
+# Run it
+./deepseek-harness-*-x86_64.AppImage
 ```
 
-该命令会启动 Web UI，默认地址为 `http://127.0.0.1:3080`。详见 [Web UI 指南](docs/user/guide/index.md)。
+AppImage 是便携式格式，无需安装即可在大多数 Linux 发行版上运行。
 
-### 从源码运行
+### 系统要求
 
-如需从仓库源码运行：
-
-```sh
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-cd deepseek-harness
-pnpm install
-pnpm run build
-pnpm dsh web
-```
-
-## 社区与支持
-
-- 欢迎通过 [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) 提交反馈或 bug 报告。
-- 为你的插件仓库添加 [`dsh-plugin`](https://github.com/topics/dsh-plugin) 话题，便于被发现。
-- 欢迎加入 DeepSeek Harness 企微群：扫码添加企微小助手并填写入群问卷，完成后小助手会邀请你入群。
-
-<table>
-  <thead>
-    <tr>
-      <th align="center">企微小助手</th>
-      <th align="center">入群问卷</th>
-      <th align="center">微信公众号</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="center"><img src="assets/community-wecom-assistant.png" alt="DeepSeek Harness 企微小助手二维码" width="180" height="180"></td>
-      <td align="center"><a href="https://trtgsjkv6r.feishu.cn/share/base/form/shrcnIt5twSVdLGD52KJBckGCgg"><img src="assets/community-wecom-survey.png" alt="DeepSeek Harness 入群问卷二维码" width="180" height="180"></a></td>
-      <td align="center"><img src="assets/community-wechat-official-account.png" alt="DeepSeek Harness 团队微信公众号二维码" width="180" height="180"></td>
-    </tr>
-  </tbody>
-</table>
-
-## 参与贡献
-
-参见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- Windows 10+（64 位）
+- Linux（AppImage）
 
 ## 开发
 
-请先阅读[开发指南](docs/development.md)与[架构文档](docs/architecture.md)。
+构建桌面应用参见 [apps/desktop/BUILD.md](apps/desktop/BUILD.md)；Harness 本身的开发参见[开发指南](docs/development.md)。
 
-面向 agent：请遵循 [AGENTS.md](AGENTS.md)。
+## 工作原理
+
+```
+┌────────────────────────────────────────────────────────┐
+│ Electron main process (apps/desktop/src/main.ts)       │
+│   window management → loads the dsh web UI             │
+│   updater (updater.ts) → GitHub release check          │
+└──────────────┬─────────────────────────────┬───────────┘
+               │ loadFile / localhost:3080   │ releases
+               ▼                             ▼
+┌────────────────────────────────────┐  ┌──────────────────────────────┐
+│ dsh web UI (packages/bundle/       │  │ GitHub Releases              │
+│ web-app)                           │  │ deepseek-harness-*-setup.exe │
+│   local loopback web service       │  │ deepseek-harness-*.AppImage  │
+│   http://127.0.0.1:3080/           │  └──────────────────────────────┘
+└──────────────┬─────────────────────┘
+               │
+               ▼
+┌────────────────────────────────────┐
+│ dsh Harness core (packages/*)      │
+│   profile / sessions / settings    │
+│   → local storage on this machine  │
+└────────────────────────────────────┘
+```
+
+## 说明
+
+> ⚠️ **开发预览** — 上游 dsh 仍在快速迭代，存在破坏性变更；本项目同步跟随。
+
+> ⚠️ **非官方构建** — 本桌面版派生自 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)，并非由 DeepSeek 官方团队维护。
+
+> ⚠️ **安全声明** — dsh 具备本地代码执行能力。仅供学习 / 研究 / 测试，请在可信、隔离的环境中使用。
+
+## 相关项目
+
+- [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) — 上游 dsh agent 平台
 
 ## 许可证
 
-[MIT](LICENSE)
-
-第三方依赖及其许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+[MIT](LICENSE) — 第三方依赖及其许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

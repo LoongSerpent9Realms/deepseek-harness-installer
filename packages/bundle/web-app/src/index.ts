@@ -91,8 +91,22 @@ export function resolveLanTrust(bindHost: string, extra: readonly string[]): Web
   return { lanAddresses, trustedHosts: [...lanAddresses, ...extra] }
 }
 
-/** Model-visible orientation and acceptance boundary for sessions created through `dsh web`. */
+/**
+ * Model-visible orientation and acceptance boundary for sessions created
+ * through `dsh web`. The desktop shell (`desktop-main.cjs`) spawns the same
+ * `dsh web` service and sets `DSH_DESKTOP=1`; in that mode the surface is the
+ * DeepSeek Harness desktop app window, not a browser tab, and the
+ * web-dev-server/refresh contract does not apply.
+ */
 function webSurfacePrompt(webUrl: string): string {
+  if (process.env.DSH_DESKTOP === '1') {
+    return 'You are interacting with the user through the DeepSeek Harness desktop app — an Electron window hosting this harness GUI. '
+      + 'When the user refers to "this app", "this window", "this GUI", or "this page" without naming another target, they mean this desktop app. '
+      + 'Plugin UIs you register in Slots, approvals, Run cards, and tool results appear inside this app window. '
+      + 'The page provides no implicit DOM, route, or screenshot context beyond what the app exposes. '
+      + 'The local service driving this app was started by the desktop shell; starting another server does not update this app. '
+      + 'Do not start a replacement server unless the user asks; if one is needed, use a managed background job and verify its exact URL.'
+  }
   const updateContract = 'The client-plugin HMR receiver is active, but client-plugin changes reload without a refresh only while '
     + '`pnpm run dev:web` is also running from this same checkout to rebuild their bundles; verify that watcher before promising automatic updates. '
     + 'Every other change — the apps/web shell and plain packages — requires rebuilding the affected Web artifacts and verifying this existing URL after a page refresh. '

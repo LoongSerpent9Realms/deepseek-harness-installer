@@ -29,4 +29,8 @@
   font-size: 11px;
   line-height: 16px;
   color: var(--dsw-alias-label-primary);
+  /* Allow text selection in JSON content. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }

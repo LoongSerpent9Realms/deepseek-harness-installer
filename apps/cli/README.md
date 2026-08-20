@@ -42,6 +42,10 @@ Use `--dump-default-config` and `--dump-config` to inspect the composed tree wit
 
 The [CLI behavior reference](reference/README.md) owns exact layer precedence, flags, shutdown behavior, deployment defaults, and source execution.
 
+## Windows installer
+
+`pnpm run package:windows` builds `dist/windows/deepseek-harness-<version>-setup.exe` with NSIS. The installer carries the built npm release packages, a Node runtime, and Electron, so installed commands do not require a system Node installation. The Start Menu launches a desktop window; its loopback web service stays inside the application rather than opening a browser. User data remains in the DSH home directory and is not removed by uninstall.
+
 ## Development
 
 Production runs require built package and frontend artifacts. From the repository root, run `pnpm run build` separately, then use `pnpm dsh <args...>` to run the TypeScript entry and forward every argument; the [source-execution reference](reference/README.md#source-execution) owns the module-resolution contract.

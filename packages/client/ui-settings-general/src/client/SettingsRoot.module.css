@@ -4,6 +4,23 @@
    panel is a two-column layout — 188px nav rail + content column with a
    54px header and the 24px-padded options area. */
 
+/* Prevent text selection across the entire settings UI. */
+.panel,
+.panel *,
+.trigger,
+.triggerLabel,
+.navTitle,
+.navCell,
+.navLabel,
+.header,
+.close,
+.options,
+.options * {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
 /* Trigger row: the 42px foot-row box shared with the Cordis footer action. */
 .trigger {
   flex: none;

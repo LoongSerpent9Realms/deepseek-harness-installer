@@ -1,0 +1,58 @@
+{
+  "name": "@deepseek-ai/dsh-desktop",
+  "description": "DeepSeek Harness Desktop - Electron wrapper for dsh-web-app with auto-update support",
+  "version": "0.1.0-rc.7",
+  "main": "dist/main.js",
+  "type": "module",
+  "files": [
+    "dist",
+    "!dist/**/*.map"
+  ],
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc && electron-builder --dir",
+    "build:win": "tsc && electron-builder --win",
+    "build:mac": "tsc && electron-builder --mac",
+    "build:linux": "tsc && electron-builder --linux",
+    "prepack": "tsc"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9",
+    "@deepseek-ai/dsh-web-app": "workspace:^"
+  },
+  "devDependencies": {
+    "electron": "37.2.6",
+    "electron-builder": "^25.1.8",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  },
+  "build": {
+    "appId": "com.deepseek.dsh",
+    "productName": "DeepSeek Harness",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/@deepseek-ai/dsh-web-app/**/*"
+    ],
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "assets/icon.png"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "LoongSerpent9Realms",
+      "repo": "deepseek-harness-installer",
+      "private": false
+    }
+  }
+}

@@ -9,6 +9,10 @@
   font-size: 16px;
   line-height: 28px;
   color: var(--dsw-alias-label-primary);
+  /* Allow text selection in assistant messages. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .body {

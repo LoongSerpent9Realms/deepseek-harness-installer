@@ -53,6 +53,10 @@
   font: var(--dsw-font-markdown-code-block);
   overflow-x: auto;
   overflow-y: hidden;
+  /* Allow text selection in search results. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 /* No wrapping: a match line or a path keeps its content on one row and scrolls
@@ -61,6 +65,10 @@
   min-height: var(--dsl-search-line-height);
   padding-left: 14px;
   white-space: pre;
+  /* Allow text selection in search result lines. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 /* The 1-based line number ahead of a grep match line, dimmed so the match text
@@ -90,6 +98,10 @@
   font-weight: 600;
   color: var(--dsw-alias-label-primary);
   white-space: pre;
+  /* Allow text selection in file paths. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .fileCount {

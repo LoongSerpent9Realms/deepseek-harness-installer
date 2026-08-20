@@ -42,6 +42,10 @@ profile 目录包含一个 `package.json`，其中记录树外插件依赖，以
 
 层的确切优先级、flag、关闭行为、部署默认值和源码执行方式，以 [CLI（命令行界面）行为参考](reference/README.md)为准。
 
+## Windows 安装程序
+
+`pnpm run package:windows` 使用 NSIS 构建 `dist/windows/deepseek-harness-<version>-setup.exe`。安装程序携带已构建的 npm 发布包、Node 运行时和 Electron，因此安装后的命令不依赖系统安装的 Node。开始菜单会打开独立的桌面窗口；回环 web 服务只在应用程序内部使用，不会打开浏览器。用户数据保留在 DSH 主目录中，卸载不会删除它们。
+
 ## 开发
 
 生产运行需要已构建的包与前端产物。请在仓库根目录单独运行 `pnpm run build`，然后使用 `pnpm dsh <args...>` 运行 TypeScript 入口并转发所有参数；模块解析约定以[源码执行参考](reference/README.md#source-execution)为准。

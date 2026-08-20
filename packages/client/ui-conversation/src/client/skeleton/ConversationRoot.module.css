@@ -3,6 +3,16 @@
    this fills its cell. Figma: Header 39:27730 (83px two-row), tabs 13px with
    a 2px active bar. */
 
+/* Prevent text selection across the conversation root UI (conversation content handled separately). */
+.root,
+.root *,
+.header,
+.headerHidden {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
 .root {
   display: flex;
   flex-direction: column;

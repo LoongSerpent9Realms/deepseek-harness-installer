@@ -974,6 +974,10 @@ export function WorkspaceBrowser({
 
   return (
     <div className={clsx(css.root, !wide && css.rail)}>
+      {/* Fold-drag affordance: a registered drag-drop overlay (e.g. the
+          ui-workspace-drag-drop plugin) mounts here and covers the region
+          while a filesystem drag is active. */}
+      {renderSlot('sidebar.workspaces.dragDrop', {})}
       <div className={css.sectionHeader}>
         {wide && (
           <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>

@@ -29,6 +29,7 @@ declare module '@deepseek-ai/cordis' {
 }
 
 export {
+  applyEntrySubpathCorrection,
   composeEntries,
   DEFAULT_PROFILE_BUNDLES,
   healProfilesModuleFallback,
@@ -38,6 +39,7 @@ export {
   PROFILE_TEMPLATES,
   PROFILES_DIR,
   readProfileManifest,
+  reconcileBundleEntryNames,
   resolveBundleDir,
   resolveProfileDir,
   writeProfileManifest,
@@ -322,7 +324,12 @@ function parsePatchList(
 ): PatchOptions[] {
   let parsed: unknown
   try {
-    parsed = yaml.load(content, { schema: userPatchesSchema })
+    // Older profile skin managers appended entries after the template's
+    // standalone `[]`. Treat that marker as an empty prefix when a real list
+    // follows; without this normalization the otherwise valid entries form
+    // an invalid YAML stream and prevent the service from starting.
+    const normalized = content.replace(/\[\]\s*(?=\r?\n(?:\s*#.*\r?\n)*\s*-)/u, '')
+    parsed = yaml.load(normalized, { schema: userPatchesSchema })
   } catch (error) {
     throw new Error(`${binName}: failed to parse ${label} ${file}: ${String(error)}`)
   }

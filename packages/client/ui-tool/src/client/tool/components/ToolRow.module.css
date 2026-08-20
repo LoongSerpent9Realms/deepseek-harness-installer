@@ -244,6 +244,10 @@
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--dsw-alias-label-secondary);
+  /* Allow text selection in tool I/O text. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 /* A failed call's OUT text shares the collapsed summary's error color. */
@@ -277,6 +281,10 @@
   overflow-wrap: anywhere;
   font: var(--dsw-font-xs-13);
   color: var(--dsw-alias-label-tertiary);
+  /* Allow text selection in search recovery text. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 /* In-row code renders at the smaller code size (12/18) via each primitive's

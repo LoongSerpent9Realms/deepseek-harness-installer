@@ -104,18 +104,34 @@
 
 .stringValue {
   color: var(--json-tree-string);
+  /* Allow text selection in JSON string values. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .numberValue {
   color: var(--json-tree-number);
+  /* Allow text selection in JSON number values. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .keywordValue {
   color: var(--json-tree-keyword);
+  /* Allow text selection in JSON keyword values. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .otherValue {
   color: var(--dsw-alias-label-secondary);
+  /* Allow text selection in JSON other values. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .punctuation {

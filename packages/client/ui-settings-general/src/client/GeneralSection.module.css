@@ -1,6 +1,13 @@
 /* Feature-contributed rows own their chrome and separators; the section
  * strips the trailing separator wherever the column ends. */
 
+/* Prevent text selection across the general settings UI. */
+.section {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
 .section {
   display: flex;
   flex-direction: column;

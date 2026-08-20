@@ -385,7 +385,7 @@ describe('validateJsonSchemaValue', () => {
     const disjoint = asserted({ oneOf: [{ type: 'string' }, { type: 'number' }] })
     expect(validateJsonSchemaValue(disjoint, 'x')).toEqual([])
     expect(validateJsonSchemaValue(disjoint, null))
-      .toEqual(['"value" must match exactly one oneOf branch (matched 0)'])
+      .toEqual(['"value" must match exactly one oneOf branch (matched 0); first branch failed: "value" must be a string'])
     const overlap = asserted({ oneOf: [{ type: 'number' }, { type: 'integer' }] })
     expect(validateJsonSchemaValue(overlap, 1))
       .toEqual(['"value" must match exactly one oneOf branch (matched 2)'])
@@ -400,7 +400,7 @@ describe('validateJsonSchemaValue', () => {
 
     expect(validateJsonSchemaValue(schema, 'leaf')).toEqual([])
     expect(validateJsonSchemaValue(schema, 42))
-      .toEqual(['"value" must match exactly one oneOf branch (matched 0)'])
+      .toEqual(['"value" must match exactly one oneOf branch (matched 0); first branch failed: "value" must be null'])
   })
 
   it('an unconstrained schema accepts only lossless JSON values', () => {

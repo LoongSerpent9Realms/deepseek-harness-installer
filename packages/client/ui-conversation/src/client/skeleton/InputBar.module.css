@@ -17,6 +17,28 @@
    empty state; the transition between the two is a position move of one
    component. */
 
+/* Prevent text selection across the input bar UI (except the textarea itself). */
+.root,
+.root *,
+.hero,
+.notice,
+.noticeError,
+.card,
+.textareaWrap,
+.actions,
+.select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection in the textarea input. */
+.textarea {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+}
+
 .root {
   display: flex;
   flex-direction: column;
@@ -367,6 +389,10 @@
   white-space: nowrap;
   cursor: pointer;
   appearance: none;
+  /* Prevent text selection in mode/model selectors. */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
 }
 
 .select:hover:not(:disabled) {

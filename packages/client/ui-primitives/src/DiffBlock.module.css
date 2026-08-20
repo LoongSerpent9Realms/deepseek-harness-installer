@@ -38,6 +38,10 @@
   font: var(--dsw-font-markdown-code-block);
   overflow-x: auto;
   overflow-y: hidden;
+  /* Allow text selection in diff content. */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 /* No wrapping, no word-break: a diff is read by its indentation. */

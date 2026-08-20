@@ -6,6 +6,20 @@
    (.collapsed) only applies after the fade settles, so nothing reflows
    mid-slide. */
 
+/* Prevent text selection across the entire sidebar UI. */
+.root,
+.root *,
+.logoRow,
+.brand,
+.iconButton,
+.newSession,
+.regionArea,
+.footArea {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
 .root {
   --dsh-sidebar-inline-padding: 12px;
   display: flex;
@@ -86,7 +100,9 @@
 
 /* Logo row (figma pad (4,8,4,8)): expanded keeps the panel toggle at the
    right edge; the rail gives every control the same base left anchor before
-   the shared entry translation is applied. */
+   the shared entry translation is applied.
+   On Electron Windows hidden-titlebar windows this whole row doubles as the
+   draggable window handle; interactive children below opt out via no-drag. */
 .logoRow {
   flex: none;
   display: flex;
@@ -98,6 +114,8 @@
   margin-bottom: 8px;
   box-sizing: border-box;
   overflow: hidden;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 .collapsed .logoRow {
@@ -109,8 +127,9 @@
 
 /* Brand group (figma I133:7632): the full wordmark rides the text ink
    (figma flows: the main-screen instance is black; blue is brand
-   emphasis only). A button only in behavior (New Session shortcut): the
-   pointer cursor is the sole affordance — no hover chrome on the mark. */
+   emphasis only). It is now a non-interactive visual element: on desktop
+   hidden-titlebar windows the logo row is a drag handle, and a dedicated
+   New Session button already exists below it. */
 .brand {
   flex: 1;
   min-width: 0;
@@ -121,7 +140,6 @@
   border: none;
   background: transparent;
   color: inherit;
-  cursor: pointer;
 }
 
 .iconButton {
@@ -137,6 +155,8 @@
   background: transparent;
   cursor: pointer;
   color: var(--dsw-alias-label-secondary);
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .iconButton:hover {
@@ -190,6 +210,8 @@
   line-height: 22px;
   cursor: pointer;
   overflow: hidden;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .newSession:hover {

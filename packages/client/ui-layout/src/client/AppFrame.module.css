@@ -1,3 +1,15 @@
+/* Prevent text selection across the main app frame UI. */
+.frame,
+.frame *,
+.sidebarCol,
+.centerCol,
+.detailsCol,
+.handle {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
 .frame {
   position: relative; /* anchors the drag handles, which straddle column borders */
   display: grid;

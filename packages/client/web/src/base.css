@@ -23,6 +23,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-bg-base);
+  /* Prevent text selection across the entire UI by default. */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
 }
 
 /* Form controls don't inherit the body font (UA sheets pin their families —

@@ -31,6 +31,42 @@ function requireAgent(exec: ToolExecution): Agent {
   return exec.agent
 }
 
+/**
+ * Normalize the `cordis_define` `plugin` argument. Models occasionally
+ * stringify the nested plugin object; recover that form before using it, and
+ * reject anything else with a message that states both accepted shapes.
+ */
+function normalizeDefinePlugin(plugin: unknown):
+  | { kind: 'new'; idPrefix: string }
+  | { kind: 'existing'; pluginId: ReturnType<typeof CordisDynamicPluginId> } {
+  let candidate: unknown = plugin
+  if (typeof candidate === 'string') {
+    try {
+      candidate = JSON.parse(candidate)
+    } catch {
+      // Fall through to the explicit shape error below.
+    }
+  }
+  if (candidate === null || typeof candidate !== 'object' || Array.isArray(candidate)) {
+    throw new Error(
+      'cordis_define plugin must be an object: { kind: "new", idPrefix: "<3-6 lowercase letters>" } '
+      + `or { kind: "existing", pluginId: "<exact id>" } (received ${typeof plugin === 'string' ? plugin.slice(0, 80) : JSON.stringify(plugin)})`,
+    )
+  }
+  const kind = (candidate as { kind?: unknown }).kind
+  if (kind === 'new') {
+    const idPrefix = (candidate as { idPrefix?: unknown }).idPrefix
+    if (typeof idPrefix === 'string') return { kind: 'new', idPrefix }
+  } else if (kind === 'existing') {
+    const pluginId = (candidate as { pluginId?: unknown }).pluginId
+    if (typeof pluginId === 'string') return { kind: 'existing', pluginId: CordisDynamicPluginId(pluginId) }
+  }
+  throw new Error(
+    'cordis_define plugin must be an object: { kind: "new", idPrefix: "<3-6 lowercase letters>" } '
+    + `or { kind: "existing", pluginId: "<exact id>" } (received ${JSON.stringify(candidate)})`,
+  )
+}
+
 /** Register the Cordis tools and explicit `@pluginId` context injection. */
 export function apply(ctx: Context): void {
   ctx.systemPrompt.section({ name: 'tool:cordis', order: 115, text: CORDIS_SYSTEM_PROMPT })
@@ -180,6 +216,10 @@ export function apply(ctx: Context): void {
               pluginId: { type: 'string', required: true, description: 'Exact ID of an existing Plugin; the new Package is appended to that instance.' },
             },
           },
+          {
+            type: 'string',
+            description: 'JSON string form of the plugin object ({ "kind": "new", "idPrefix": "..." } or { "kind": "existing", "pluginId": "..." }); models occasionally stringify nested objects.',
+          },
         ],
       },
       name: { type: 'string', required: true, description: 'Short, readable Package name.' },
@@ -215,9 +255,7 @@ export function apply(ctx: Context): void {
       presentationMeta: (_args, value) => ({ pluginId: value.pluginId, packageId: value.packageId }),
     },
     execute(args, exec) {
-      const plugin = args.plugin.kind === 'new'
-        ? { kind: 'new' as const, idPrefix: args.plugin.idPrefix }
-        : { kind: 'existing' as const, pluginId: CordisDynamicPluginId(args.plugin.pluginId) }
+      const plugin = normalizeDefinePlugin(args.plugin)
       const receipt = ctx.dynamicCordisRunner.define({
         sessionId: requireAgent(exec).id,
         plugin,
